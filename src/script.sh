@@ -7,7 +7,7 @@ commands=(
     "python main.py --machine machine   --used_data 'GridGraphall'   --prompt_content 'node_graph' --flag=2, --task_id='dcn_Pdpm1e7"
 )
 
-# 运行每个命令
+# 运行每个命令2323
 for cmd in "${commands[@]}"
 do
     echo "Running: $cmd"
