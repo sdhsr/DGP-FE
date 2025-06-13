@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/dataset/train_data" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/GraphPEMSD7_43_288_his_12_pred_6_dcn_dp" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/GraphPEMSD7_43_288_his_12_pred_6_dcn_dp_MultiScaleMemory" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/GraphPEMSD7_43_288_his_12_pred_6_dcn_dp_me" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_GraphPEMSD7_43_288_PType_'node_graph'_his_12_pred_6_U" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_GraphPEMSD7_43_288_PType_'node_graph'_his_12_pred_6_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_GraphPEMSD7_43_288_TaxiNYCIn_48_TaxiNYCOut_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_GraphPEMSL_43_288_PType_'node_graph'_his_6_pred_6_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48/model_save" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12-Meaflow_bs64" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'Uniflow_bs_64" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_FedFlow" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_FedFlow_bs_64" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_64_pred_64_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiBJ13_48_TaxiNYCIn_48_TaxiNYCOut_48_PType_'node_graph'_his_12_pred_12_UniFlow/model_save" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_'node_graph'_his_12_pred_12_DCRNN" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_'node_graph'_his_12_pred_12_FedFlow_lr3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_'node_graph'_his_12_pred_12_Fedflow_GCN_DP" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_'node_graph'_his_12_pred_12_UniFlow_lr3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_node_graph_his_12_pred_12_FedFlow_DCRNN_DP" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_node_graph_his_12_pred_12_UseData_GridGraphall_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCOut_48_PType_'node_graph'_his_12_pred_12_FedFlow_l3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_TaxiNYCOut_48_PType_'node_graph'_his_12_pred_12_UniFlow_lr3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/Size_middle_Dataset_output_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_DCN_m_GDP_5000" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_DCN_m_GDP_5001" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_DCN_m_embd" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_DCN2" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Gdp_350" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Pdp_flag0_1e6" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Pdp_flag2" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Pdp_flag3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_dp_MultiScaleMemory" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/TaxiNYCOut_48_his_12_pred_12_dcn_dp" />
+      <excludeFolder url="file://$MODULE_DIR$/src/experiments_all/Exp/aaaaa" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/GraphPEMSD7_43_288_his_12_pred_6_dcn_dp" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/GraphPEMSD7_43_288_his_12_pred_6_dcn_dp_MultiScaleMemory" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/GraphPEMSD7_43_288_his_12_pred_6_dcn_dp_me" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_GraphPEMSD7_43_288_PType_'node_graph'_his_12_pred_6_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_GraphSH_28_96_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_-Meaflow_bs64" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_FedFlow" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_FedFlow_bs_64" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_Uniflow_bs_64" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_PType_'node_graph'_his_64_pred_64_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiBJ13_48_TaxiNYCIn_48_TaxiNYCOut_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_'node_graph'_his_12_pred_12_UniFlow_lr3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiNYCIn_48_PType_node_graph_his_12_pred_12_UseData_GridGraphall_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_TaxiNYCOut_48_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/Size_middle_Dataset_output_PType_'node_graph'_his_12_pred_12_UseData_'GridGraphall'_machine" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_DCN_m_GDP_5000" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_DCN_m_GDP_5001" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_DCN_m_embd" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_DCN2" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Gdp_350" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Gdp_5000" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Pdp_flag0_1e6" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Pdp_flag2" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_Pdp_flag3" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCIn_48_his_12_pred_12_dcn_dp_MultiScaleMemory" />
+      <excludeFolder url="file://$MODULE_DIR$/src/logs_all/Exp/TaxiNYCOut_48_his_12_pred_12_dcn_dp" />
+    </content>
+    <orderEntry type="jdk" jdkName="pytorch" jdkType="Python SDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="PyDocumentationSettings">
+    <option name="format" value="PLAIN" />
+    <option name="myDocStringFormat" value="Plain" />
+  </component>
+</module>

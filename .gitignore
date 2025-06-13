@@ -1,0 +1,3 @@
+dataset/**/*
+src/experiments_all/**/*
+src/logs_all/**/*
