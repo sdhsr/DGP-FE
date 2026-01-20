@@ -1,4 +1,4 @@
-# UniFlow
+# DGP-FE
 
 This is the official implementation of our paper: **A Foundation Model for Unified Urban Spatio-Temporal Flow Prediction**.
 
