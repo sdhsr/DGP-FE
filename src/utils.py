@@ -36,34 +36,54 @@ def args_to_dict(args, keys):
     return {k: getattr(args, k) for k in keys}
 
 def select_batch_size(args, dataset):
-    if 'TaxiNYC' in dataset:
-        batch_size = int(args.batch_size_nyc * args.batch_ratio)
-    if 'Crowd' in dataset or 'Flow' in dataset or 'Pop' in dataset:
-        batch_size = int(args.batch_size_crowd * args.batch_ratio)
-    if 'TaxiBJ' in dataset:
-        batch_size = int(args.batch_size_taxibj * args.batch_ratio)
-    if 'Graph' in dataset:
-        batch_size = int(args.batch_size_graph_large * args.batch_ratio)
-        if 'SH' in dataset:
-             batch_size = int(batch_size*0.8)
 
+
+    if dataset == 'Pemsd7L_288':
+        batch_size = int(args.batch_size_pemsd7L * args.batch_ratio)
+    elif dataset == 'Pemsd7_288':
+        batch_size = int(args.batch_size_pemsd7 * args.batch_ratio)
+    elif dataset == 'PEMS08_288':
+        batch_size = int(args.batch_size_PEMS08 * args.batch_ratio)
+    elif dataset == 'PemsBay_288':
+        batch_size = int(args.batch_size_PemsBay * args.batch_ratio)
+    elif 'TaxiNYC' in dataset:
+        batch_size = int(args.batch_size_nyc * args.batch_ratio)
+    elif 'TaxiBJ' in dataset:
+        batch_size = int(args.batch_size_taxibj * args.batch_ratio)
+    elif 'Graph' in dataset:
+         batch_size = int(args.batch_size_graph_large * args.batch_ratio)
+
+    # if 'Graph' in dataset:
+    #     batch_size = int(args.batch_size_graph_large * args.batch_ratio)
+    #     if 'SH' in dataset:
+    #          batch_size = int(batch_size*0.8)
+    #     elif 'Pemsd7' in dataset:
+    #          batch_size = int(args.batch_size_pemsd7 * args.batch_ratio)
     return batch_size
 
 def select_patch_size(args, data):
 
-    MIN, MID, MAX = [2,2,100]
-    
-    if 'TaxiBJ' in data or 'Flow' in data or 'TaxiNYC' in data or 'Crowd' in data or 'Pop' in data:
-        patch_size = MIN
 
+    patch_size = args.patch_size
     if 'Graph' in data:
-        patch_size = MAX
         if 'SH' in data:
-            patch_size = MAX * 2
-        elif 'PEMS' in data:
-            patch_size=4
+            patch_size = 100
+        elif 'Pems' in data:
+            patch_size=args.patch_size  ##Pemsd7L:3
 
-    return patch_size 
+    # MIN, MID, MAX = [2,2,100]
+    # patch_size = MIN
+    # if 'TaxiBJ' in data or 'Flow' in data or 'TaxiNYC' in data or 'Crowd' in data or 'Pop' in data:
+    #     patch_size = MIN
+    #
+    # if 'Graph' in data:
+    #     patch_size = MAX
+    #     if 'SH' in data:
+    #         patch_size = MAX * 2
+    #     elif 'Pems' in data:
+    #         patch_size=3  ##Pemsd7L:3
+
+    return patch_size
 
 
 def tensor_to_adjacency_matrix(tensor):

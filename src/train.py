@@ -52,16 +52,73 @@ class TrainLoop:
 
 
 
+    # ##梯度加噪
+    # def run_step(self, batch, step, mask_ratio, mask_strategy, index, name, topo=None, subgraphs=None):
+    #     self.opt.zero_grad()
+    #     loss, num, loss_real, num2, loss_real_nonmask = self.forward_backward(batch, step, mask_ratio, mask_strategy,
+    #                                                                           index=index, name=name, topo=topo,
+    #                                                                           subgraphs=subgraphs)
+    #
+    #     self._anneal_lr()
+    #     # ===== 4. 梯度裁剪（差分隐私重要步骤）=====
+    #     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.args.clip_grad)
+    #
+    #     # ===== 2. 动态噪声函数设计 =====
+    #
+    #     # 初始化记录 loss（用于平滑）
+    #     if not hasattr(self, "smoothed_loss"):
+    #         self.smoothed_loss = loss
+    #     else:
+    #         # 使用 EMA 方式平滑损失，减少 early big loss 的影响
+    #         alpha = 0.8
+    #         self.smoothed_loss = alpha * self.smoothed_loss + (1 - alpha) * loss
+    #
+    #     # 基本参数
+    #     base_noise = 0.5  # 初始噪声
+    #     min_noise = 1e-6  # 最小噪声下限
+    #     decay_rate = 0.001  # 控制 step 衰减速率
+    #     loss_scale = 100.0  # 控制 loss 对噪声影响的平滑系数（越大越稳定）
+    #
+    #     # 1) loss_factor: 使用平滑过的 log(1 + loss) 控制
+    #     loss_factor = math.log(1 + self.smoothed_loss / loss_scale)
+    #
+    #     # 2) step_factor: 随训练步数缓慢减小
+    #     step_factor = 1.0 / (1.0 + decay_rate * step)
+    #
+    #     # 合成噪声强度
+    #     noise_std = base_noise * loss_factor * step_factor
+    #
+    #     noise_std = max(noise_std, min_noise)
+    #
+    #     # ===== 3. 添加高斯噪声到梯度（差分隐私）=====
+    #     for param in self.model.parameters():
+    #         if param.grad is not None:
+    #             noise = torch.normal(mean=0, std=noise_std, size=param.grad.shape, device=param.grad.device)
+    #             param.grad += noise
+    #
+    #     # ===== 4. 参数更新 =====
+    #     self.opt.step()
+    #
+    #     self.writer.add_scalar('Training/loss_real', loss_real, step)
+    #     self.writer.add_scalar('Training/noise_std', noise_std, step)
+    #
+    #     return loss, num, loss_real, num2, loss_real_nonmask
 
+
+       ##参数上加噪
     def run_step(self, batch, step, mask_ratio, mask_strategy, index, name, topo=None, subgraphs=None):
         self.opt.zero_grad()
         loss, num, loss_real, num2, loss_real_nonmask = self.forward_backward(batch, step, mask_ratio, mask_strategy,
                                                                               index=index, name=name, topo=topo,
                                                                               subgraphs=subgraphs)
 
+
         self._anneal_lr()
         # ===== 4. 梯度裁剪（差分隐私重要步骤）=====
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.args.clip_grad)
+
+        # ===== 5. 参数更新 =====
+        self.opt.step()
 
         # ===== 2. 动态噪声函数设计 =====
 
@@ -74,9 +131,9 @@ class TrainLoop:
             self.smoothed_loss = alpha * self.smoothed_loss + (1 - alpha) * loss
 
         # 基本参数
-        base_noise = 0.5  # 初始噪声
-        min_noise = 1e-6  # 最小噪声下限
-        decay_rate = 0.001  # 控制 step 衰减速率
+        base_noise = 1  # 初始噪声
+        min_noise = 1e-7  # 最小噪声下限
+        decay_rate = 0.01  # 控制 step 衰减速率
         loss_scale = 100.0  # 控制 loss 对噪声影响的平滑系数（越大越稳定）
 
         # 1) loss_factor: 使用平滑过的 log(1 + loss) 控制
@@ -90,140 +147,95 @@ class TrainLoop:
 
         noise_std = max(noise_std, min_noise)
 
-        # ===== 3. 添加高斯噪声到梯度（差分隐私）=====
+        ###增加噪声
         for param in self.model.parameters():
-            if param.grad is not None:
-                noise = torch.normal(mean=0, std=noise_std, size=param.grad.shape, device=param.grad.device)
-                param.grad += noise
-
-        # ===== 4. 参数更新 =====
-        self.opt.step()
+            if param.requires_grad:
+                noise = torch.normal(mean=0.0, std=noise_std, size=param.data.size(), device=param.data.device)
+                param.data.add_(noise)
 
         self.writer.add_scalar('Training/loss_real', loss_real, step)
         self.writer.add_scalar('Training/noise_std', noise_std, step)
 
+
+        #####以下都是在参数上加噪
+        # if self.args.flag==0:
+        #     for param in self.model.parameters():
+        #         if param.requires_grad:
+        #             noise = torch.normal(mean=0.0, std=1e-6, size=param.data.size(), device=param.data.device)
+        #             param.data.add_(noise)
+        #
+        #     self.writer.add_scalar('Training/loss_real', loss_real, step)
+        #
+        # elif self.args.flag==2:
+        #     def noise_decay(step, initial_scale=0.01, min_scale=1e-7, decay_rate=0.03, loss_weight=0.5):
+        #         """
+        #         基于 step 和 loss_val 共同控制噪声大小：
+        #         - initial_scale：初始噪声 std
+        #         - min_scale：最小噪声 std
+        #         - decay_rate：控制 step 的指数衰减
+        #         - loss_weight：控制 loss 对当前噪声的影响（建议在 0 ~ 1）
+        #         """
+        #         # 1. Step 控制的指数衰减
+        #         decay_std = initial_scale * np.exp(-decay_rate * step)
+        #
+        #         # # 2. Loss 控制部分（归一化后再调节，避免数值过大）
+        #         # if loss_val is not None:
+        #         #     loss_factor = np.tanh(loss_val)  # 将 loss 限定在 [0,1)
+        #         #     decay_std *= (1.0 + loss_weight * loss_factor)
+        #
+        #         # 3. 控制最小噪声下界
+        #         return max(decay_std, min_scale)
+        #
+        #     ###增加噪声
+        #     # ===== 6. 参数扰动（加噪）实现差分隐私 =====
+        #     noise_std = noise_decay(step=step, initial_scale=0.01, decay_rate=0.02, loss_weight=0.1)
+        #
+        #     for param in self.model.parameters():
+        #         if param.requires_grad:
+        #             noise = torch.normal(mean=0.0, std=noise_std, size=param.data.size(), device=param.data.device)
+        #             param.data.add_(noise)
+        #
+        #     self.writer.add_scalar('Training/loss_real', loss_real, step)
+        #     self.writer.add_scalar('Training/noise_std', noise_std, step)
+
+
+         ###flag:3
+        # def noise_decay(step, initial_scale=0.1, min_scale=1e-6, decay_rate=0.001, loss_weight=0.5):
+        #     """
+        #     基于 step 和 loss_val 共同控制噪声大小：
+        #     - initial_scale：初始噪声 std
+        #     - min_scale：最小噪声 std
+        #     - decay_rate：控制 step 的指数衰减
+        #     - loss_weight：控制 loss 对当前噪声的影响（建议在 0 ~ 1）
+        #     """
+        #     # 1. Step 控制的指数衰减
+        #     decay_std = initial_scale * np.exp(-decay_rate * step)
+        #
+        #     # # 2. Loss 控制部分（归一化后再调节，避免数值过大）
+        #     # if loss_val is not None:
+        #     #     loss_factor = np.tanh(loss_val)  # 将 loss 限定在 [0,1)
+        #     #     decay_std *= (1.0 + loss_weight * loss_factor)
+        #
+        #     # 3. 控制最小噪声下界
+        #     return max(decay_std, min_scale)
+        #
+        #
+        # ###增加噪声
+        # # ===== 6. 参数扰动（加噪）实现差分隐私 =====
+        # noise_std = noise_decay(step=step, initial_scale=0.01, decay_rate=0.01, loss_weight=0.1)
+        #
+        #
+        # for param in self.model.parameters():
+        #     if param.requires_grad:
+        #         noise = torch.normal(mean=0.0, std=noise_std, size=param.data.size(), device=param.data.device)
+        #         param.data.add_(noise)
+        #
+        #
+        # self.writer.add_scalar('Training/loss_real', loss_real, step)
+        # self.writer.add_scalar('Training/noise_std', noise_std, step)
+        #
+
         return loss, num, loss_real, num2, loss_real_nonmask
-
-
-
-    # def run_step(self, batch, step, mask_ratio, mask_strategy, index, name, topo=None, subgraphs=None):
-    #     self.opt.zero_grad()
-    #     loss, num, loss_real, num2, loss_real_nonmask = self.forward_backward(batch, step, mask_ratio, mask_strategy,
-    #                                                                           index=index, name=name, topo=topo,
-    #                                                                           subgraphs=subgraphs)
-    #
-    #     self._anneal_lr()
-    #     # ===== 4. 梯度裁剪（差分隐私重要步骤）=====
-    #     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.args.clip_grad)
-    #
-    #
-    #
-    #     # 噪声衰减函数：可根据 step 和 loss_real 调整
-    #     def noise_decay(step, loss_val=None, initial_scale=0.2, min_scale=1e-4, decay_rate=0.001, loss_factor=0.05):
-    #         decay = initial_scale * np.exp(-decay_rate * step)
-    #         # if loss_val is not None:
-    #         #     decay *= (1.0 + loss_factor * loss_val)
-    #         return max(decay, min_scale)
-    #
-    #         # === 2. 差分隐私梯度噪声添加 ===
-    #
-    #     noise_std = noise_decay(  #step=step, initial_scale=0.01, decay_rate=0.01, loss_weight=0.1
-    #         step,
-    #         loss_val=loss_real,
-    #         initial_scale=0.01,  # 初始噪声强度
-    #         decay_rate=0.01,  # 每步衰减率（越小越慢）
-    #         loss_factor=0.05  # 随 loss 大小动态缩放
-    #     )
-    #
-    #     for param in self.model.parameters():
-    #         if param.requires_grad and param.grad is not None:
-    #             noise = torch.normal(mean=0.0, std=noise_std, size=param.grad.shape, device=param.grad.device)
-    #             param.grad.add_(noise)
-    #
-    #
-    #     # ===== 5. 参数更新 =====
-    #     self.opt.step()
-    #
-    #
-    #     #####以下都是在参数上加噪
-    #     # if self.args.flag==0:
-    #     #     for param in self.model.parameters():
-    #     #         if param.requires_grad:
-    #     #             noise = torch.normal(mean=0.0, std=1e-6, size=param.data.size(), device=param.data.device)
-    #     #             param.data.add_(noise)
-    #     #
-    #     #     self.writer.add_scalar('Training/loss_real', loss_real, step)
-    #     #
-    #     # elif self.args.flag==2:
-    #     #     def noise_decay(step, initial_scale=0.01, min_scale=1e-7, decay_rate=0.03, loss_weight=0.5):
-    #     #         """
-    #     #         基于 step 和 loss_val 共同控制噪声大小：
-    #     #         - initial_scale：初始噪声 std
-    #     #         - min_scale：最小噪声 std
-    #     #         - decay_rate：控制 step 的指数衰减
-    #     #         - loss_weight：控制 loss 对当前噪声的影响（建议在 0 ~ 1）
-    #     #         """
-    #     #         # 1. Step 控制的指数衰减
-    #     #         decay_std = initial_scale * np.exp(-decay_rate * step)
-    #     #
-    #     #         # # 2. Loss 控制部分（归一化后再调节，避免数值过大）
-    #     #         # if loss_val is not None:
-    #     #         #     loss_factor = np.tanh(loss_val)  # 将 loss 限定在 [0,1)
-    #     #         #     decay_std *= (1.0 + loss_weight * loss_factor)
-    #     #
-    #     #         # 3. 控制最小噪声下界
-    #     #         return max(decay_std, min_scale)
-    #     #
-    #     #     ###增加噪声
-    #     #     # ===== 6. 参数扰动（加噪）实现差分隐私 =====
-    #     #     noise_std = noise_decay(step=step, initial_scale=0.01, decay_rate=0.02, loss_weight=0.1)
-    #     #
-    #     #     for param in self.model.parameters():
-    #     #         if param.requires_grad:
-    #     #             noise = torch.normal(mean=0.0, std=noise_std, size=param.data.size(), device=param.data.device)
-    #     #             param.data.add_(noise)
-    #     #
-    #     #     self.writer.add_scalar('Training/loss_real', loss_real, step)
-    #     #     self.writer.add_scalar('Training/noise_std', noise_std, step)
-    #
-    #
-    #      ###flag:3
-    #     # def noise_decay(step, initial_scale=0.1, min_scale=1e-6, decay_rate=0.001, loss_weight=0.5):
-    #     #     """
-    #     #     基于 step 和 loss_val 共同控制噪声大小：
-    #     #     - initial_scale：初始噪声 std
-    #     #     - min_scale：最小噪声 std
-    #     #     - decay_rate：控制 step 的指数衰减
-    #     #     - loss_weight：控制 loss 对当前噪声的影响（建议在 0 ~ 1）
-    #     #     """
-    #     #     # 1. Step 控制的指数衰减
-    #     #     decay_std = initial_scale * np.exp(-decay_rate * step)
-    #     #
-    #     #     # # 2. Loss 控制部分（归一化后再调节，避免数值过大）
-    #     #     # if loss_val is not None:
-    #     #     #     loss_factor = np.tanh(loss_val)  # 将 loss 限定在 [0,1)
-    #     #     #     decay_std *= (1.0 + loss_weight * loss_factor)
-    #     #
-    #     #     # 3. 控制最小噪声下界
-    #     #     return max(decay_std, min_scale)
-    #     #
-    #     #
-    #     # ###增加噪声
-    #     # # ===== 6. 参数扰动（加噪）实现差分隐私 =====
-    #     # noise_std = noise_decay(step=step, initial_scale=0.01, decay_rate=0.01, loss_weight=0.1)
-    #     #
-    #     #
-    #     # for param in self.model.parameters():
-    #     #     if param.requires_grad:
-    #     #         noise = torch.normal(mean=0.0, std=noise_std, size=param.data.size(), device=param.data.device)
-    #     #         param.data.add_(noise)
-    #     #
-    #     #
-    #     # self.writer.add_scalar('Training/loss_real', loss_real, step)
-    #     # self.writer.add_scalar('Training/noise_std', noise_std, step)
-    #     #
-    #
-    #     return loss, num, loss_real, num2, loss_real_nonmask
 
 
     def Sample(self, test_data, step, mask_ratio, mask_strategy, seed=None, dataset='', index=0, Type='val'):
@@ -308,6 +320,8 @@ class TrainLoop:
             if Type == 'val':
                 self.writer.add_scalar('Evaluation/{}-{}-{}'.format(dataset_name.split('_C')[0], s, m), result, epoch)
             elif Type == 'test':
+
+                print(result,mae)
                 self.writer.add_scalar('Test_RMSE/{}'.format(dataset_name), result, epoch)
                 self.writer.add_scalar('Test_MAE/{}'.format(dataset_name), mae, epoch)
 
@@ -389,7 +403,6 @@ class TrainLoop:
                 batch = (value, timestamps)  #([204, 24, 2]
 
 
-
                 loss, num, loss_real, num2, loss_real_nonmask = self.run_step(batch, step, mask_ratio=mask_ratio,
                                                                               mask_strategy=mask_strategy, index=0,
                                                                               name=name, topo=matrix,
@@ -403,8 +416,8 @@ class TrainLoop:
                 # e1=time.time()
                 # print(k+1,"/",total,"cost time:",e1-s1,"seconds")
                 # k=k+1
-                # # break
-
+                # if k==6:
+                #     break
 
 
             end = time.time()

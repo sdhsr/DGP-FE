@@ -7,7 +7,19 @@ import datetime
 import copy
 import random
 import os
-from utils import tensor_to_adjacency_matrix
+from sklearn.cluster import KMeans
+from scipy.sparse.linalg import eigsh
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv
+from torch_geometric.utils import dense_to_sparse
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.cluster import SpectralClustering
+from sklearn.manifold import MDS
+from scipy.spatial import ConvexHull
+
+import math
 import utils
 import networkx as nx
 import pymetis
@@ -71,6 +83,7 @@ def partition_graph(G, num_parts):
     print("禁止使用!!")
     return parts
 
+
 def graph_split(num_nodes, adj, patch_size):
     '''
     ``adjacency[i]`` needs to be an iterable of vertices adjacent to vertex i.
@@ -78,20 +91,54 @@ def graph_split(num_nodes, adj, patch_size):
     '''
 
     num = num_nodes // patch_size
-
+    print("子图数量num =", num)
     n_cuts, membership = pymetis.part_graph(num, adjacency=adj)
-
     node_split = []
-
     for i in range(max(membership)+1):
         node_split.append(torch.tensor(np.argwhere(np.array(membership) == i).ravel()))
-
     node_split = [i for i in node_split if len(i) > 0]
-
     lengths = [len(i) for i in node_split]
     print(set(lengths))
 
+    # print(len(node_split))
+    # print(node_split)
+    # exit()
     return node_split
+
+def random_graph_split(num_nodes, adj, patch_size):
+    """
+    随机划分图节点为若干子图，每个子图大小约为 patch_size
+    输入:
+        num_nodes: 节点总数
+        adj: 邻接表 (与 METIS 接口一致，但这里不会用到)
+        patch_size: 每个子图期望的节点数
+    返回:
+        node_split: list[Tensor]，每个 tensor 表示一个子图的节点索引
+    """
+    # 计算子图数量
+    num_patches = num_nodes // patch_size
+    print("随机划分子图数量 =", num_patches)
+
+    # 生成所有节点索引并打乱
+    all_nodes = np.arange(num_nodes)
+    np.random.shuffle(all_nodes)
+
+    # 均匀划分成子图
+    node_split = []
+    for i in range(num_patches):
+        start = i * patch_size
+        end = (i + 1) * patch_size if i < num_patches - 1 else num_nodes
+        patch_nodes = all_nodes[start:end]
+        node_split.append(torch.tensor(patch_nodes, dtype=torch.long))
+
+    # 打印每个子图的节点数量
+    lengths = [len(p) for p in node_split]
+    print("各子图节点数分布:", set(lengths))
+
+    return node_split
+
+
+
 
 def data_load_index(args,dataset):
     
@@ -100,19 +147,29 @@ def data_load_index(args,dataset):
 
 
     folder_path = '../dataset/train_data/UniFlow_dataset/{}.npy'.format(dataset) # T * H * W
+
     data = torch.tensor(np.load(folder_path)).float()
 
     #new_test_batch = int(data.shape[0] * 0.2-args.pred_len-args.his_len)
 
     print('data:{}, shape:{}, PatchSize:{}, BatchSize:{}, NumBatch:{}'.format(dataset, data.shape, patch_size, batch_size, len(data)//batch_size))
+    #输出：data:GraphPemsd7_288, shape:torch.Size([12672, 228, 1]), PatchSize:100, BatchSize:32, NumBatch:396
 
     l, n, f = data.shape
+    if 'GraphPems04' in dataset:
+        ts = np.load('../dataset/train_data/UniFlow_dataset/GraphPems04_288_ts.npy'.format(dataset))
+    elif 'GraphPems08' in dataset:
+        ts = np.load('../dataset/train_data/UniFlow_dataset/GraphPems08_288_ts.npy'.format(dataset))
 
-    ts = np.load('../dataset/train_data/UniFlow_dataset/{}_ts.npy'.format(dataset))  #测试数据
+    else:
+        ts = np.load('../dataset/train_data/UniFlow_dataset/{}_ts.npy'.format(dataset))
+
+
 
     print(dataset)
-
     args.seq_len = args.his_len + args.pred_len
+
+
 
     if os.path.exists('../dataset/train_data/UniFlow_dataset/matrix_{}.json'.format(dataset)):
         f = open('../dataset/train_data/UniFlow_dataset/matrix_{}.json'.format(dataset),'r')
@@ -123,6 +180,18 @@ def data_load_index(args,dataset):
         nodes = matrix['nodes'].values()
         adj = [i for i in matrix['adj']]
         subgraphs = graph_split(len(nodes), adj, patch_size)
+        # if args.flag==0 or  args.flag==55:
+        #     print('正在使用方案:', args.flag)
+        #     subgraphs = graph_split(len(nodes), adj, patch_size)
+        #     # print(subgraphs)
+        #
+        # elif args.flag==10:##随机
+        #     print("使用随机")
+        #     subgraphs = random_graph_split(len(nodes), adj, patch_size)
+        #     print(subgraphs)
+        # else:
+        #     print("出错!!!")
+        #     exit()
 
     else:
         edges = torch.tensor(edge_generate_grid(n//patch_size, f//patch_size)).long()
@@ -145,9 +214,18 @@ def data_load_index(args,dataset):
     args.mean_value = torch.mean(data).item()
 
     num_samples = l - (args.his_len + args.pred_len) + 1
-    train_num = round(num_samples * 0.6)
-    valid_num = round(num_samples * 0.2)
-    test_num = num_samples - train_num - valid_num
+
+    if 'Pems' in dataset:
+        print('Pems数据集训练：验证：测试=6:2:2')
+        train_num = round(num_samples * 0.6)
+        valid_num = round(num_samples * 0.2)
+        test_num = num_samples - train_num - valid_num
+    else:
+        print('Pems数据集训练：验证：测试=6:2:2')
+        train_num = round(num_samples * 0.6)
+        valid_num = round(num_samples * 0.2)
+        test_num = num_samples - train_num - valid_num
+
 
     index_list = []
     for t in range(args.his_len, num_samples + args.his_len):
@@ -166,9 +244,13 @@ def data_load_index(args,dataset):
     if args.few_ratio < 1 and (dataset in args.few_data or args.few_data in dataset):
         train_index  = train_index[:int(len(train_index )*args.few_ratio)]
 
-    train_index = th.utils.data.DataLoader(train_index, num_workers=4, batch_size=batch_size, shuffle=True) 
-    test_index = th.utils.data.DataLoader(test_index, num_workers=4, batch_size =  batch_size, shuffle=False)
-    val_index = th.utils.data.DataLoader(valid_index, num_workers=4, batch_size = batch_size, shuffle=False)
+    # if args.mode=='testing':
+    #     print("不打乱训练数据集")
+    #     train_index = th.utils.data.DataLoader(train_index, num_workers=0, batch_size=batch_size, shuffle=False)
+    # else:
+    train_index = th.utils.data.DataLoader(train_index, num_workers=0, batch_size=batch_size, shuffle=True)
+    test_index = th.utils.data.DataLoader(test_index, num_workers=0, batch_size =  batch_size, shuffle=False)
+    val_index = th.utils.data.DataLoader(valid_index, num_workers=0, batch_size = batch_size, shuffle=False)
 
     return data, timestamps, train_index, test_index, val_index, my_scaler, edges, subgraphs
 
@@ -191,6 +273,9 @@ def data_load_index_mix(args):
         my_scaler_all[dataset_name] = my_scaler
 
     train_index_all = [(n, j, m, s) for n, index, m, s in train_index_all for j in index]
+    # if args.mode == 'testing':
+    #     print("不打乱")
+    # else:
     random.seed(1111)
     random.shuffle(train_index_all)
 

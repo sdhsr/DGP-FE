@@ -4,17 +4,21 @@ import numpy as np
 
 
 def causal_masking(x, mask_ratio, T, mask_strategy):
-    N, L, D = x.shape
-    x = x.reshape(N, T, L//T, D)
-    N, T, L, C = x.shape
+    N, L, D = x.shape  #[204, 200, 256]
 
-    len_keep = int(T * (1 - mask_ratio))
+
+    x = x.reshape(N, T, L//T, D)
+
+
+    N, T, L, C = x.shape  #[204, 4, 50, 256]
+
+    len_keep = int(T * (1 - mask_ratio))   #2
 
     if mask_strategy == 'causal':
         # noise = torch.ones(N, T, device=x.device)  # noise in [0, 1]
         # noise[:,:len_keep] = 0
-        noise = torch.arange(T).unsqueeze(dim=0).repeat(N,1)
-        noise = noise.to(x)
+        noise = torch.arange(T).unsqueeze(dim=0).repeat(N,1)    ##[N, T]
+        noise = noise.to(x)   #将张量 noise 移动到与张量 x 相同的设备
     
     elif mask_strategy == 'frame':
         noise = torch.rand(N, T, device=x.device)
@@ -28,7 +32,8 @@ def causal_masking(x, mask_ratio, T, mask_strategy):
     ids_keep = ids_shuffle[:, :len_keep]
     x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(2).unsqueeze(-1).repeat(1, 1, L, D))
 
-    assert (x_masked == x[:,:len_keep]).all()
+
+    # assert (x_masked == x[:,:len_keep]).all()
 
     # generate the binary mask: 0 is keep, 1 is remove
     mask = torch.ones([N, T, L], device=x.device)

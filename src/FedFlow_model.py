@@ -52,6 +52,7 @@ class TransformerDecoderModel(nn.Module):
 
 
 def model_select(args, **kwargs):
+    print("正在使用FedFlow模型！！！")
     if args.size == 'small':
         model = FedFlow_model(
             embed_dim=128,

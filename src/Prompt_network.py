@@ -1,13 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-# --------------------------------------------------------
-# References:
-# timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
-# DeiT: https://github.com/facebookresearch/deit
-# --------------------------------------------------------
 
 from functools import partial
 
@@ -249,6 +239,7 @@ class MultiScaleMemory(nn.Module):
             self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=1)
 
         self._initialize_weights()
+        print("model initialized memory")
 
     def _initialize_weights(self):
         for i in range(self.n_scales):
@@ -327,6 +318,7 @@ class Memory(nn.Module):
         
         self.initialize_weights()
 
+        print('num memory = ', num_memory)
         print("model initialized memory")
 
 
@@ -370,5 +362,56 @@ class Memory(nn.Module):
         out = F.linear(att_weight, self.memMatrix.permute(1, 0))  # [N,M] by [M,C]  --> [N,C]
 
         return dict(out=out, att_weight=att_weight)
+
+
+
+# class DynamicMemory(nn.Module):
+#     def __init__(self, num_memory, memory_dim, temporal_agg=False, args=None):
+#         super().__init__()
+#
+#         self.num_memory = num_memory
+#         self.memory_dim = memory_dim
+#         self.temporal_agg = temporal_agg
+#         self.memMatrix = nn.Parameter(torch.zeros(num_memory, memory_dim))  # 存储记忆的矩阵
+#         self.keyMatrix = nn.Parameter(torch.zeros(num_memory, memory_dim))  # 存储记忆键的矩阵
+#
+#         self.x_proj = nn.Linear(memory_dim, memory_dim)
+#         if temporal_agg:
+#             encoder_layer = nn.TransformerEncoderLayer(d_model=memory_dim, nhead=4, dim_feedforward=memory_dim, batch_first=True)
+#             self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=1)
+#
+#         self.initialize_weights()
+#
+#     def initialize_weights(self):
+#         # 初始化记忆矩阵和键矩阵
+#         torch.nn.init.trunc_normal_(self.memMatrix, std=0.02)
+#         torch.nn.init.trunc_normal_(self.keyMatrix, std=0.02)
+#
+#         # 初始化线性层
+#         self.apply(self._init_weights)
+#
+#     def _init_weights(self, m):
+#         if isinstance(m, nn.Linear):
+#             torch.nn.init.xavier_uniform_(m.weight)
+#             if m.bias is not None:
+#                 nn.init.constant_(m.bias, 0)
+#         elif isinstance(m, nn.LayerNorm):
+#             nn.init.constant_(m.bias, 0)
+#             nn.init.constant_(m.weight, 1.0)
+#
+#     def forward(self, x):
+#         # x: 当前的输入数据，形状为 [N, C]，N是批量大小，C是特征数
+#         x_query = torch.tanh(self.x_proj(x))  # 生成查询向量
+#
+#         # 计算当前时间步的相关性分数（基于记忆键矩阵）
+#         att_weight = F.linear(x_query, self.keyMatrix)  # 计算注意力权重，形状为 [N, M]
+#         att_weight = F.softmax(att_weight, dim=-1)  # 使用softmax归一化
+#
+#         # 根据注意力权重从记忆矩阵中检索信息
+#         out = F.linear(att_weight, self.memMatrix.permute(1, 0))  # 形状为 [N, C]
+#
+#         self.memory_dim = memory + att_weight.unsqueeze(-1) * x
+#
+#         return out, att_weight
 
 

@@ -52,6 +52,7 @@ class TransformerDecoderModel(nn.Module):
 
 
 def model_select(args, **kwargs):
+    print("正在使用DCN模型！！！")
     if args.size == 'small':
         model = DCN_model(
             embed_dim=128,
@@ -735,11 +736,8 @@ class EncoderBlock(nn.Module):
 
         #加一层激活函数
         y = y + self.drop_path(self.activation(self.mlp(self.norm2(y))))
-
         res,_ = self.decomp2(x+y)
-
         #seasonal_init, trend_init = self.decomp(x)   #趋势分解
-        #输出[51, 768, 256]
 
         return res
 
@@ -836,7 +834,7 @@ class DecoderBlock(nn.Module):
         y=x
         #加一层激活函数
         y = x + self.drop_path(self.activation(self.mlp(self.norm2(y))))
-        x,trend3 = self.decomp2(x+y)
+        x,trend3 = self.decomp3(x+y)
 
         residual_trend = trend1 + trend2 + trend3
 
@@ -1029,7 +1027,7 @@ class DCN_model(nn.Module):
         self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
         self.pred_model_linear_GraphNJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
         self.pred_model_linear_GraphSH = nn.Linear(decoder_embed_dim, self.t_patch_size * 210 * in_chans)
-        self.pred_model_linear_GraphPEMS = nn.Linear(decoder_embed_dim, self.t_patch_size * 116 * in_chans)
+        self.pred_model_linear_GraphPems = nn.Linear(decoder_embed_dim, self.t_patch_size * self.args.num_nodes * in_chans)
 
         self.initialize_weights_trivial()
         ################################################
@@ -1059,14 +1057,23 @@ class DCN_model(nn.Module):
                       bias=not self.args.no_qkv_bias)
         ])
 
-        self.head_layer_4 = nn.Sequential(*[
+        self.head_layer_3 = nn.Sequential(*[
             nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim, bias=not self.args.no_qkv_bias),
             nn.GELU(),
             nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim, bias=not self.args.no_qkv_bias),
             nn.GELU(),
-            nn.Linear(self.decoder_embed_dim, self.t_patch_size * 4 ** 2 * self.in_chans,
+            nn.Linear(self.decoder_embed_dim, self.t_patch_size * 3 ** 2 * self.in_chans,
                       bias=not self.args.no_qkv_bias)
         ])
+
+        # self.head_layer_4 = nn.Sequential(*[
+        #     nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim, bias=not self.args.no_qkv_bias),
+        #     nn.GELU(),
+        #     nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim, bias=not self.args.no_qkv_bias),
+        #     nn.GELU(),
+        #     nn.Linear(self.decoder_embed_dim, self.t_patch_size * 4 ** 2 * self.in_chans,
+        #               bias=not self.args.no_qkv_bias)
+        # ])
 
         self.initialize_weights_trivial()
 
@@ -1080,8 +1087,11 @@ class DCN_model(nn.Module):
         self.prompt_spatial_patch_f_1 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 1)
         self.prompt_spatial_patch_t_2 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 2)
         self.prompt_spatial_patch_f_2 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 2)
-        self.prompt_spatial_patch_t_4 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 4)
-        self.prompt_spatial_patch_f_4 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 4)
+        self.prompt_spatial_patch_t_3 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 3)
+        self.prompt_spatial_patch_f_3 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 3)
+
+        # self.prompt_spatial_patch_t_4 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 4)
+        # self.prompt_spatial_patch_f_4 = SpatialPatchEmb(self.embed_dim, self.embed_dim, 4)
         self.temporal_patch = nn.Conv1d(in_channels=1, out_channels=self.embed_dim, kernel_size=self.args.t_patch_size,
                                         stride=self.args.t_patch_size)
         encdoer_layer = nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=2, dim_feedforward=self.embed_dim,
@@ -1091,15 +1101,13 @@ class DCN_model(nn.Module):
                                            padding=1, padding_mode='circular', bias=False)
 
 
-        # self.gcn_t = GAT(self.embed_dim, self.embed_dim, self.embed_dim)       ##替换为DCRNN---todo@有效果---
+        # self.gcn_t = GAT(self.embed_dim, self.embed_dim, self.embed_dim)        ##替换为DCRNN---todo@有效果---
         # self.gcn_f = GAT(self.embed_dim, self.embed_dim, self.embed_dim)
+        # self.gcn_topo_t = GAT(self.embed_dim, self.embed_dim, self.embed_dim)
+        # self.gcn_topo_f = GAT(self.embed_dim, self.embed_dim, self.embed_dim)
 
         self.gcn_t = DCRNNWrapper(self.embed_dim, self.embed_dim, self.embed_dim, k=2)
         self.gcn_f = DCRNNWrapper(self.embed_dim, self.embed_dim, self.embed_dim, k=2)
-
-        # self.gcn_topo_t = GCN(self.embed_dim, self.embed_dim, self.embed_dim)
-        # self.gcn_topo_f = GCN(self.embed_dim, self.embed_dim, self.embed_dim)
-
         self.gcn_topo_t = DCRNNWrapper(self.embed_dim, self.embed_dim, self.embed_dim, k=2)
         self.gcn_topo_f = DCRNNWrapper(self.embed_dim, self.embed_dim, self.embed_dim, k=2)
 
@@ -1108,8 +1116,8 @@ class DCN_model(nn.Module):
 
         # self.enc_memory_t = Memory(num_memory=self.args.num_memory, memory_dim=self.embed_dim, args=self.args)    #替换为多尺度版本----todo-@有效果
         # self.enc_memory_f = Memory(num_memory=self.args.num_memory, memory_dim=self.embed_dim, args=self.args)
-        self.enc_memory_t = MultiScaleMemory(num_memory=self.args.num_memory, memory_dim=self.embed_dim,n_scales=2,args=self.args)
-        self.enc_memory_f = MultiScaleMemory(num_memory=self.args.num_memory, memory_dim=self.embed_dim,n_scales=2, args=self.args)
+        self.enc_memory_t = MultiScaleMemory(num_memory=self.args.num_memory, memory_dim=self.embed_dim,n_scales=3,args=self.args)
+        self.enc_memory_f = MultiScaleMemory(num_memory=self.args.num_memory, memory_dim=self.embed_dim,n_scales=3, args=self.args)
 
         self.prompt_spatial_patch_t_1.apply(self._init_weights)
         self.prompt_spatial_patch_f_1.apply(self._init_weights)
@@ -1177,15 +1185,15 @@ class DCN_model(nn.Module):
     def patchify(self, imgs, patch_size):
         """
         imgs: (N, 3, H, W)
-        x: (N, L, patch_size**2 *3)
+        x: (N, L, patch_size**2 *3)            对输入进行分块处理
         """
         N, _, T, H, W = imgs.shape
-        p = patch_size
-        u = self.args.t_patch_size
+        p = patch_size   #=2
+        u = self.args.t_patch_size  #=2
         # assert H % p == 0 and W % p == 0 and T % u == 0
-        h = H // p
-        w = W // p
-        t = T // u
+        h = H // p  #3
+        w = W // p  #19
+        t = T // u  #12
         x = imgs.reshape(shape=(N, 1, t, u, h, p, w, p))
         x = torch.einsum("nctuhpwq->nthwupqc", x)
         x = x.reshape(shape=(N, t * h * w, u * p ** 2 * 1))
@@ -1236,41 +1244,33 @@ class DCN_model(nn.Module):
 
         return decoder_pos_embed
 
-    def forward_encoder(self, x, x_mark, mask_ratio, mask_strategy, seed=None, data=None, mode='backward', prompt={},
-                        patch_size=1, split_nodes=None):
+    def forward_encoder(self, x, x_mark, mask_ratio, mask_strategy, data=None, prompt={},patch_size=1,split_nodes=None):
         # embed patches
-        N, _, T, H, W = x.shape
+        N, _, T, H, W = x.shape     #torch.Size([204, 1, 24, 10, 20])
 
-        origin_x = x.clone()
+        # origin_x = x.clone()
 
         edges = prompt['topo']
 
-        #修改
-        # x:时空数据，x_mark:时间辅助信息，x(51,1,24,32,32)---->(),TimeEmb()
 
-        if 'Graph' not in data:
-
-            # x:时空数据，x_mark:时间辅助信息，x(51,1,24,32,32)---->(),TimeEmb()
-            x, TimeEmb = self.Embedding_patch(x, x_mark, edges, is_time=self.args.is_time_emb, patch_size=patch_size,
-                                              hour_num=data)
+        if self.args.isGraph:
+            x, TimeEmb = self.Embedding_patch_graph(x, x_mark, edges, split_nodes, is_time=self.args.is_time_emb,patch_size=patch_size, hour_num=data)
         else:
-            x, TimeEmb = self.Embedding_patch_graph(x, x_mark, edges, split_nodes, is_time=self.args.is_time_emb,
-                                                    patch_size=patch_size, hour_num=data)
+            x, TimeEmb = self.Embedding_patch(x, x_mark, edges, is_time=self.args.is_time_emb, patch_size=patch_size,hour_num=data)
 
 
-
-        _, L, C = x.shape  # x(51,512,256),TimeEmb(51,512,256)
+        _, L, C = x.shape
 
         T = T // self.args.t_patch_size
 
-        # assert mode in ['backward','forward']
+
 
         x, mask, ids_restore, ids_keep = causal_masking(x, mask_ratio, T=T, mask_strategy=mask_strategy)
 
-        if 'Graph' not in data:
-            input_size = (T, H // patch_size, W // patch_size)
-        else:
+        if self.args.isGraph:
             input_size = (T, len(split_nodes), 1)
+        else:
+            input_size = (T, H // patch_size, W // patch_size)
 
         # 生成位置编码
         pos_embed_sort = self.pos_embed_enc(ids_keep, N, input_size)
@@ -1284,101 +1284,22 @@ class DCN_model(nn.Module):
 
 
 
+        if self.args.is_prompt == 1 :
 
-        # # 提前时域和频域信息（51,256,256）
-        # prompt_t = self.enc_memory_t(prompt['t'].reshape(-1, prompt['t'].shape[-1]))
-        # prompt_t = prompt_t['out'].reshape(prompt['t'].shape)
-        #
-        # prompt_f = self.enc_memory_f(prompt['f'].reshape(-1, prompt['f'].shape[-1]))
-        # prompt_f = prompt_f['out'].reshape(prompt['f'].shape)
-        #
-        # # 自适应图(51,256,256)
-        # adp_t = F.softmax(F.relu(prompt_t @ prompt_t.transpose(1, 2)), dim=-1)  # N * (H*W) * (H*W)
-        # adp_f = F.softmax(F.relu(prompt_f @ prompt_f.transpose(1, 2)), dim=-1)
-        #
-        # data_list_t = []
-        # data_list_f = []
-        # edge_att_t, edge_att_f = [], []
-        #
-        # # 循环N生成边？？
-        # for i in range(adp_t.size(0)):
-        #     edge_index_t = adp_t[i].nonzero().t().contiguous() + i * adp_t.shape[1]
-        #     data_list_t.append(edge_index_t)
-        #     edge_att_t.append(adp_t[i][adp_t[i] != 0])
-        #
-        #     edge_index_f = adp_f[i].nonzero().t().contiguous() + i * adp_f.shape[1]
-        #     data_list_f.append(edge_index_f)
-        #     edge_att_f.append(adp_f[i][adp_f[i] != 0])
-        #
-        # edge_t = torch.cat(data_list_t, dim=-1)
-        # edge_att_t = torch.cat(edge_att_t, dim=0)
-        # edge_f = torch.cat(data_list_f, dim=-1)
-        # edge_att_f = torch.cat(edge_att_f, dim=0)
-        #
-        # prompt_t = self.gcn_t(prompt_t.reshape(-1, prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N,
-        #                                                                                             H * W // patch_size ** 2,
-        #                                                                                             self.embed_dim)
-        # prompt_f = self.gcn_f(prompt_f.reshape(-1, prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N,
-        #                                                                                             H * W // patch_size ** 2,
-        #                                                                                             self.embed_dim)
-        #
-        # # 输出：[51, 768, 256]
-        # prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,
-        #                                                                                                       x_attn.shape[
-        #                                                                                                           1],
-        #                                                                                                       self.embed_dim)
-        #
-        # prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,
-        #                                                                                                       x_attn.shape[
-        #                                                                                                           1],
-        #                                                                                                       self.embed_dim)
-        #
-        # # assert prompt_t.shape == prompt_f.shape == x_attn.shape
-        #
-        # prompt_save['t'] = prompt_t.clone()
-        # prompt_save['f'] = prompt_f.clone()
-        #
-        # prompt_t = self.enc_memory_t(prompt['t'].reshape(-1, prompt['t'].shape[-1]))
-        # prompt_t = prompt_t['out'].reshape(prompt['t'].shape)
-        #
-        # prompt_f = self.enc_memory_f(prompt['f'].reshape(-1, prompt['f'].shape[-1]))
-        # prompt_f = prompt_f['out'].reshape(prompt['f'].shape)
-        #
-        # prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,
-        #                                                                                                       x_attn.shape[
-        #                                                                                                           1],
-        #                                                                                                       self.embed_dim)
-        # prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,
-        #                                                                                                       x_attn.shape[
-        #                                                                                                           1],
-        #                                                                                                       self.embed_dim)
-        #
-        # # assert prompt_t.shape == prompt_f.shape == x_attn.shape
-        #
-        # prompt_save['node_t'] = prompt_t.clone()
-        # prompt_save['node_f'] = prompt_f.clone()
-
-
-
-        if self.args.is_prompt == 1 and 'graph' in self.args.prompt_content:
-
-
-            # 提前时域和频域信息（51,256,256）
             prompt_t = self.enc_memory_t(prompt['t'].reshape(-1, prompt['t'].shape[-1]))
             prompt_t = prompt_t['out'].reshape(prompt['t'].shape)
 
             prompt_f = self.enc_memory_f(prompt['f'].reshape(-1, prompt['f'].shape[-1]))
             prompt_f = prompt_f['out'].reshape(prompt['f'].shape)
 
-            # 自适应图(51,256,256)
             adp_t = F.softmax(F.relu(prompt_t @ prompt_t.transpose(1, 2)), dim=-1)  # N * (H*W) * (H*W)
             adp_f = F.softmax(F.relu(prompt_f @ prompt_f.transpose(1, 2)), dim=-1)
+
 
             data_list_t = []
             data_list_f = []
             edge_att_t, edge_att_f = [], []
 
-            # 循环N生成边？？
             for i in range(adp_t.size(0)):
                 edge_index_t = adp_t[i].nonzero().t().contiguous() + i * adp_t.shape[1]
                 data_list_t.append(edge_index_t)
@@ -1393,29 +1314,16 @@ class DCN_model(nn.Module):
             edge_f = torch.cat(data_list_f, dim=-1)
             edge_att_f = torch.cat(edge_att_f, dim=0)
 
-            if 'Graph' not in data:
 
-                prompt_t = self.gcn_t(prompt_t.reshape(-1, prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N,
-                                                                                                            H * W // patch_size ** 2,
-                                                                                                            self.embed_dim)
-                prompt_f = self.gcn_f(prompt_f.reshape(-1, prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N,
-                                                                                                            H * W // patch_size ** 2,
-                                                                                                            self.embed_dim)
-
+            if self.args.isGraph:
+                prompt_t = self.gcn_topo_t(prompt_t.reshape(-1, prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N,len(split_nodes),self.embed_dim)
+                prompt_f = self.gcn_topo_f(prompt_f.reshape(-1, prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N,len(split_nodes),self.embed_dim)
             else:
-                prompt_t = self.gcn_topo_t(prompt_t.reshape(-1, prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N,
-                                                                                                                 len(split_nodes),
-                                                                                                                 self.embed_dim)
-                prompt_f = self.gcn_topo_f(prompt_f.reshape(-1, prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N,
-                                                                                                                 len(split_nodes),
-                                                                                                                 self.embed_dim)
+                prompt_t = self.gcn_t(prompt_t.reshape(-1, prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N,H * W // patch_size ** 2,self.embed_dim)
+                prompt_f = self.gcn_f(prompt_f.reshape(-1, prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N,H * W // patch_size ** 2,self.embed_dim)
 
 
-
-            #输出：[51, 768, 256]
             prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,x_attn.shape[1],self.embed_dim)
-
-
             prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,x_attn.shape[1],self.embed_dim)
 
 
@@ -1424,9 +1332,7 @@ class DCN_model(nn.Module):
             prompt_save['t'] = prompt_t.clone()
             prompt_save['f'] = prompt_f.clone()
 
-        if self.args.is_prompt == 1 and 'node' in self.args.prompt_content:
-
-
+        if self.args.is_prompt == 1 :
 
 
             prompt_t = self.enc_memory_t(prompt['t'].reshape(-1, prompt['t'].shape[-1]))
@@ -1435,14 +1341,8 @@ class DCN_model(nn.Module):
             prompt_f = self.enc_memory_f(prompt['f'].reshape(-1, prompt['f'].shape[-1]))
             prompt_f = prompt_f['out'].reshape(prompt['f'].shape)
 
-            prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,
-                                                                                                                  x_attn.shape[
-                                                                                                                      1],
-                                                                                                                  self.embed_dim)
-            prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,
-                                                                                                                  x_attn.shape[
-                                                                                                                      1],
-                                                                                                                  self.embed_dim)
+            prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,x_attn.shape[1],self.embed_dim)
+            prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len // self.args.t_patch_size, 1, 1).reshape(N,x_attn.shape[1],self.embed_dim)
 
             # assert prompt_t.shape == prompt_f.shape == x_attn.shape
 
@@ -1450,19 +1350,13 @@ class DCN_model(nn.Module):
             prompt_save['node_f'] = prompt_f.clone()
 
 
-        # trend_all = torch.zeros_like(x_attn)
 
-
-            #[9, 315, 256]
-          ##输入：torch.Size([51, 200, 256])
         for index, blk in enumerate(self.enblocks):
-            # x_attn, trend_part=blk(x_attn, attn_bias=attn_bias)
-            # trend_all=trend_all+trend_part
             x_attn = blk(x_attn, attn_bias=attn_bias)
 
         return x_attn, mask, ids_restore, input_size, TimeEmb, prompt_save
 
-    def forward_decoder(self, x, x_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size=None, data=None,
+    def forward_decoder(self, x, x_mark, mask, ids_restore, TimeEmb, input_size=None,
                         prompt_graph={}):
         N = x.shape[0]
         T, H, W = input_size
@@ -1487,83 +1381,20 @@ class DCN_model(nn.Module):
 
         attn_bias = prompt_graph
 
+        if self.args.is_prompt == 1:
+            prompt_t, prompt_f = prompt_graph['t'], prompt_graph['f']
 
-          #修改
-         # torch.Size([51, 768, 256]) torch.Size([51, 768, 256])
-        prompt_t, prompt_f = prompt_graph['t'], prompt_graph['f']
+            prompt_t = prompt_t.reshape(N, -1, H * W, prompt_t.shape[-1])[:, :1].repeat(1, (self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,prompt_t.shape[-1])
+            prompt_f = prompt_f.reshape(N, -1, H * W, prompt_f.shape[-1])[:, :1].repeat(1, (self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,prompt_f.shape[-1])
 
-        prompt_t = prompt_t.reshape(N, -1, H * W, prompt_t.shape[-1])[:, :1].repeat(1, (
-                self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-                                                                                                 prompt_t.shape[
-                                                                                                     -1])
-        prompt_f = prompt_f.reshape(N, -1, H * W, prompt_f.shape[-1])[:, :1].repeat(1, (
-                self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-                                                                                                 prompt_f.shape[
-                                                                                                     -1])
+            x_attn += prompt_f + prompt_t
 
-        # if self.args.is_prompt == 1 and 'graph' in self.args.prompt_content:
-        #
-        #    #torch.Size([51, 768, 256]) torch.Size([51, 768, 256])
-        #     prompt_t, prompt_f = prompt_graph['t'], prompt_graph['f']
-        #
-        #
-        #     prompt_t = prompt_t.reshape(N, -1, H * W, prompt_t.shape[-1])[:, :1].repeat(1, (
-        #                 self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-        #                                                                                                  prompt_t.shape[
-        #                                                                                                      -1])
-        #     prompt_f = prompt_f.reshape(N, -1, H * W, prompt_f.shape[-1])[:, :1].repeat(1, (
-        #                 self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-        #                                                                                                  prompt_f.shape[
-        #                                                                                                      -1])
+            prompt_t, prompt_f = prompt_graph['node_t'], prompt_graph['node_f']
+            prompt_t = prompt_t.reshape(N, -1, H * W, prompt_t.shape[-1])[:, :1].repeat(1, (self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,prompt_t.shape[-1])
+            prompt_f = prompt_f.reshape(N, -1, H * W, prompt_f.shape[-1])[:, :1].repeat(1, (self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,prompt_f.shape[-1])
 
+            x_attn += prompt_f + prompt_t
 
-            # assert x_attn.shape == prompt_t.shape == prompt_f.shape
-
-            #修改
-        x_attn += prompt_f + prompt_t
-            # if 'graph_t' in self.args.prompt_content:
-            #     x_attn = x_attn + prompt_t
-            # elif 'graph_f' in self.args.prompt_content:
-            #     x_attn = x_attn + prompt_f
-            # else:
-            #
-            #     x_attn += prompt_f + prompt_t
-
-
-        #修改
-        prompt_t, prompt_f = prompt_graph['node_t'], prompt_graph['node_f']
-        prompt_t = prompt_t.reshape(N, -1, H * W, prompt_t.shape[-1])[:, :1].repeat(1, (
-                self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-                                                                                                 prompt_t.shape[
-                                                                                                     -1])
-        prompt_f = prompt_f.reshape(N, -1, H * W, prompt_f.shape[-1])[:, :1].repeat(1, (
-                self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-                                                                                                 prompt_f.shape[
-                                                                                                     -1])
-
-        x_attn += prompt_f + prompt_t
-        # if self.args.is_prompt == 1 and 'node' in self.args.prompt_content:
-        #     prompt_t, prompt_f = prompt_graph['node_t'], prompt_graph['node_f']
-        #     prompt_t = prompt_t.reshape(N, -1, H * W, prompt_t.shape[-1])[:, :1].repeat(1, (
-        #                 self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-        #                                                                                                  prompt_t.shape[
-        #                                                                                                      -1])
-        #     prompt_f = prompt_f.reshape(N, -1, H * W, prompt_f.shape[-1])[:, :1].repeat(1, (
-        #                 self.args.his_len + self.args.pred_len) // self.args.t_patch_size, 1, 1).reshape(N, -1,
-        #                                                                                                  prompt_f.shape[
-        #                                                                                                      -1])
-        #
-        #     x_attn += prompt_f + prompt_t
-
-
-            # # assert x_attn.shape == prompt_t.shape == prompt_f.shape
-            # if 'node_t' in self.args.prompt_content:
-            #     x_attn = x_attn + prompt_t
-            #
-            # elif 'node_f' in self.args.prompt_content:
-            #     x_attn = x_attn + prompt_f
-            # else:
-            #     x_attn += prompt_f + prompt_t
 
         # apply Transformer blocks
         trend_all = torch.zeros_like(x_attn)
@@ -1589,17 +1420,16 @@ class DCN_model(nn.Module):
 
         # assert pred.shape == target.shape
 
+
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
         mask = mask.view(loss.shape)
 
         loss1 = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
-        loss2 = (loss * (1 - mask)).sum() / (1 - mask).sum()
-        return loss1, loss2, target
+
+        return loss1, target
 
     def graph_loss(self, pred, target):
-        # assert pred.shape == target.shape
-        # assert pred.shape[1] == self.args.his_len + self.args.pred_len
 
         loss1 = ((pred[:, self.args.his_len:] - target[:, self.args.his_len:]) ** 2).mean()
 
@@ -1611,78 +1441,108 @@ class DCN_model(nn.Module):
 
         return loss1, loss2, target, mask
 
-    def adpative_graph(self, img, img_mark, DataEmbedding, data, node_split=None, patch_size=2):
+
+    def adpative_graph(self, img, img_mark, DataEmbedding,node_split=None, patch_size=2):
+
         N, _, T, H, W = img.shape
         # img_mark : N * T * 2
 
-        img_origin = img.clone().squeeze(dim=1).reshape(N, T, H * W)  # (51,24,1024)
-        img_origin = img_origin.permute(0, 2, 1).reshape(N * H * W, T)  # (N*H*W) * T    (52224,24)
-        img_origin = img_origin[:, :self.args.his_len]   # only use history data      (52224,12)
+        img_origin = img.clone().squeeze(dim=1).reshape(N, T, H * W)
+        img_origin = img_origin.permute(0, 2, 1).reshape(N * H * W, T)  # (N*H*W) * T
+        img_origin = img_origin[:, :self.args.his_len]    # only use history data
 
-        img_spec = torch.fft.rfft(img_origin, n=img_origin.shape[-1], norm="ortho",
-                                  dim=-1)  # [N, K] K = T//2 + 1     (52224,7)
-        img_spec = img_spec.reshape(N, H, W, self.args.his_len // 2 + 1)  # (51,32,32,7)
+        img_spec = torch.fft.rfft(img_origin, n=img_origin.shape[-1], norm="ortho",dim=-1)  # [N, K] K = T//2 + 1
+        img_spec = img_spec.reshape(N, H, W, self.args.his_len // 2 + 1)
 
-        img_spec = torch.cat((img_spec.real, img_spec.imag), dim=-1)  # [N, H, W, 2(his_len//2+1)]   (51,32,32,14)
+        img_spec = torch.cat((img_spec.real, img_spec.imag), dim=-1)
 
-        img_spec = self.spec_liner(img_spec)  # (51,32,32,256)
+        img_spec = self.spec_liner(img_spec)
 
-        img_tmp = img_origin.unsqueeze(1)  # (52224,1,12)
+        img_tmp = img_origin.unsqueeze(1)
 
-        img_tmp = self.temporaltokenConv(img_tmp).permute(0, 2, 1)  # N * T * Embed    (52224,12,256)
+        img_tmp = self.temporaltokenConv(img_tmp).permute(0, 2, 1)  # N * T * Embed
 
-        img_mark = img_mark[:, :self.args.his_len].unsqueeze(dim=1).repeat(1, H * W, 1, 1).reshape(N * H * W,
-                                                                                                   self.args.his_len,
-                                                                                                   2)  # (52224,12,2)
+        img_mark = img_mark[:, :self.args.his_len].unsqueeze(dim=1).repeat(1, H * W, 1, 1).reshape(N * H * W,self.args.his_len,2)
 
-        temporal_emb = DataEmbedding.temporal_emb(img_mark, data)  # 52224,12,256
+        temporal_emb = DataEmbedding.temporal_emb(img_mark, self.args.dataset)
 
-        # assert img_tmp.shape == temporal_emb.shape
-        img_tmp += temporal_emb  # 52224,12,256
-
-        #
-        img_tmp = torch.cat([self.temporal_attn_encoder(img_tmp[index:index + H * W]) for index in range(0, img_tmp.shape[0], H * W)],axis=0)[:, 0]  # 52224,256
+        img_tmp += temporal_emb
 
 
-        img_tmp = img_tmp.reshape(N, H, W, img_tmp.shape[-1])  # 51,32,32,256
+        img_tmp = torch.cat([self.temporal_attn_encoder(img_tmp[index:index + H * W]) for index in range(0, img_tmp.shape[0], H * W)],axis=0)[:, 0]
 
-        # #修改
-        # img_spec = self.prompt_spatial_patch_f_2(img_spec.permute(0, 3, 1, 2))  # 51,256,256
-        # img_tmp = self.prompt_spatial_patch_t_2(img_tmp.permute(0, 3, 1, 2))  # 51,256,256
-        if 'Graph' not in data:
+
+        img_tmp = img_tmp.reshape(N, H, W, img_tmp.shape[-1])
+
+
+
+        if self.args.isGraph:
+            # patchify
+            max_len = max([len(i) for i in node_split])
+            n_group = len(node_split)
+
+            img_tmp = torch.cat([torch.mean(torch.gather(img_tmp, 1,group.view(1, group.shape[0], 1, 1).expand(img_tmp.shape[0],group.shape[0],img_tmp.shape[2],img_tmp.shape[3]).to(img_tmp).long()), dim=1, keepdim=True) for group in node_split], dim=1).squeeze(dim=2)
+
+            img_spec = torch.cat([torch.mean(torch.gather(img_spec, 1,group.view(1, group.shape[0], 1, 1).expand(img_spec.shape[0],group.shape[0],img_spec.shape[2],img_spec.shape[3]).to(img_tmp).long()), dim=1, keepdim=True) for group in node_split], dim=1).squeeze(dim=2)
+
+        else:
             if patch_size == 1:
                 img_spec = self.prompt_spatial_patch_f_1(img_spec.permute(0, 3, 1, 2))
                 img_tmp = self.prompt_spatial_patch_t_1(img_tmp.permute(0, 3, 1, 2))
             elif patch_size == 2:
-                img_spec = self.prompt_spatial_patch_f_2(img_spec.permute(0, 3, 1, 2))  # 51,256,256
-                img_tmp = self.prompt_spatial_patch_t_2(img_tmp.permute(0, 3, 1, 2))  # 51,256,256
-            elif patch_size == 4:
-                img_spec = self.prompt_spatial_patch_f_4(img_spec.permute(0, 3, 1, 2))
-                img_tmp = self.prompt_spatial_patch_t_4(img_tmp.permute(0, 3, 1, 2))
-        else:
-            # patchify
-            max_len = max([len(i) for i in node_split])   #修改
-            n_group = len(node_split)
+                img_spec = self.prompt_spatial_patch_f_2(img_spec.permute(0, 3, 1, 2))
+                img_tmp = self.prompt_spatial_patch_t_2(img_tmp.permute(0, 3, 1, 2))
+            elif patch_size == 5:
+                img_spec = self.prompt_spatial_patch_f_5(img_spec.permute(0, 3, 1, 2))
+                img_tmp = self.prompt_spatial_patch_t_5(img_tmp.permute(0, 3, 1, 2))
 
-            img_tmp = torch.cat([torch.mean(torch.gather(img_tmp, 1,
-                                                         group.view(1, group.shape[0], 1, 1).expand(img_tmp.shape[0],
-                                                                                                    group.shape[0],
-                                                                                                    img_tmp.shape[2],
-                                                                                                    img_tmp.shape[
-                                                                                                        3]).to(
-                                                             img_tmp).long()), dim=1, keepdim=True) for group in
-                                 node_split], dim=1).squeeze(dim=2)
-
-            img_spec = torch.cat([torch.mean(torch.gather(img_spec, 1,
-                                                          group.view(1, group.shape[0], 1, 1).expand(img_spec.shape[0],
-                                                                                                     group.shape[0],
-                                                                                                     img_spec.shape[2],
-                                                                                                     img_spec.shape[
-                                                                                                         3]).to(
-                                                              img_tmp).long()), dim=1, keepdim=True) for group in
-                                  node_split], dim=1).squeeze(dim=2)
 
         return img_tmp, img_spec
+
+    # def adpative_graph(self, img, img_mark, DataEmbedding, patch_size=2):
+    #
+    #
+    #     N, _, T, H, W = img.shape
+    #     # img_mark : N * T * 2
+    #
+    #     img_origin = img.clone().squeeze(dim=1).reshape(N, T, H * W)
+    #     img_origin = img_origin.permute(0, 2, 1).reshape(N * H * W, T)  # (N*H*W) * T
+    #     img_origin = img_origin[:, :self.args.his_len]   # only use history data
+    #
+    #     img_spec = torch.fft.rfft(img_origin, n=img_origin.shape[-1], norm="ortho",
+    #                               dim=-1)  # [N, K] K = T//2 + 1     (52224,7)
+    #     img_spec = img_spec.reshape(N, H, W, self.args.his_len // 2 + 1)  # (51,32,32,7)
+    #
+    #     img_spec = torch.cat((img_spec.real, img_spec.imag), dim=-1)  # [N, H, W, 2(his_len//2+1)]
+    #
+    #     img_spec = self.spec_liner(img_spec)
+    #
+    #     img_tmp = img_origin.unsqueeze(1)
+    #     img_tmp = self.temporaltokenConv(img_tmp).permute(0, 2, 1)  # N * T * Embed
+    #
+    #     img_mark = img_mark[:, :self.args.his_len].unsqueeze(dim=1).repeat(1, H * W, 1, 1).reshape(N * H * W,self.args.his_len,2)
+    #
+    #     temporal_emb = DataEmbedding.temporal_emb(img_mark,self.args.dataset)
+    #
+    #     # assert img_tmp.shape == temporal_emb.shape
+    #     img_tmp += temporal_emb  # 52224,12,256
+    #
+    #     img_tmp = torch.cat([self.temporal_attn_encoder(img_tmp[index:index + H * W]) for index in range(0, img_tmp.shape[0], H * W)],axis=0)[:, 0]  # 52224,256
+    #
+    #     img_tmp = img_tmp.reshape(N, H, W, img_tmp.shape[-1])  # 51,32,32,256
+    #
+    #
+    #     if patch_size == 1:
+    #         img_spec = self.prompt_spatial_patch_f_1(img_spec.permute(0, 3, 1, 2))
+    #         img_tmp = self.prompt_spatial_patch_t_1(img_tmp.permute(0, 3, 1, 2))
+    #     elif patch_size == 2:
+    #         img_spec = self.prompt_spatial_patch_f_2(img_spec.permute(0, 3, 1, 2))
+    #         img_tmp = self.prompt_spatial_patch_t_2(img_tmp.permute(0, 3, 1, 2))
+    #     elif patch_size == 3:
+    #         img_spec = self.prompt_spatial_patch_f_3(img_spec.permute(0, 3, 1, 2))
+    #         img_tmp = self.prompt_spatial_patch_t_3(img_tmp.permute(0, 3, 1, 2))
+    #
+    #     return img_tmp, img_spec
 
     # Create target key padding mask
     def create_padding_mask(self, seq_lengths, max_len):
@@ -1691,98 +1551,74 @@ class DCN_model(nn.Module):
             padding_mask[i, length:] = True
         return padding_mask
 
-    def forward(self, imgs, mask_ratio=0.5, mask_strategy='causal', seed=520, data='none', mode='backward', topo=None,
-                subgraphs=None, patch_size=100):
-        '''
-        backward: 没有特定evaluation约束，forward: 有特定evaluation约束
-        '''
-        imgs, imgs_mark = imgs
+    def forward(self,X,Y, timestamps, topo,subgraphs=None):
+        #模型输入输出:[32, 228, 1, 12]
+        B=X.shape[0]
+        value = torch.cat([X, Y], dim=3)
+        value = value.permute(0, 2, 3, 1)
+        value=value.reshape(B,1,24,self.args.wide, self.args.height)   #pemsd7:6  38  |pems08 10 17
 
 
-
-        # img_tmp, img_spec = self.adpative_graph(imgs, imgs_mark, self.Embedding_patch, data=data,
-        #                                                 patch_size=patch_size)  # 时域/频域
-
+        patch_size = self.args.patch_size  #2
         if self.args.is_prompt == 1:
-            if 'Graph' not in data:
-                img_tmp, img_spec = self.adpative_graph(imgs, imgs_mark, self.Embedding_patch, data=data,
-                                                        patch_size=patch_size)  # 时域/频域
+            if self.args.isGraph:
+                img_tmp, img_spec = self.adpative_graph(value, timestamps, self.Embedding_patch_graph, node_split = subgraphs, patch_size = patch_size)
             else:
-
-                img_tmp, img_spec = self.adpative_graph(imgs, imgs_mark, self.Embedding_patch_graph, data=data,
-                                                        node_split=subgraphs, patch_size=patch_size)
+                img_tmp, img_spec = self.adpative_graph(value, timestamps, self.Embedding_patch,patch_size=patch_size)  # 时域/频域
         else:
             img_tmp = None
             img_spec = None
 
 
+        T, H, W = value.shape[2:]
 
-        T, H, W = imgs.shape[2:]
+        latent, mask, ids_restore, input_size, TimeEmb, prompt = self.forward_encoder(value, timestamps, self.args.mask_ratio,mask_strategy=self.args.mask_strategy,data=self.args.dataset,prompt={'t': img_tmp,'f': img_spec,'topo': topo},patch_size=patch_size,split_nodes=subgraphs)
 
+        #latent, mask, ids_restore, input_size, TimeEmb, prompt = self.forward_encoder(value, timestamps, mask_ratio=self.args.mask_ratio,mask_strategy=self.args.mask_strategy,prompt={'t': img_tmp,'f': img_spec,'topo': topo},patch_size=patch_size)
 
-
-        latent, mask, ids_restore, input_size, TimeEmb, prompt = self.forward_encoder(imgs, imgs_mark, mask_ratio,
-                                                                                      mask_strategy, seed=seed,
-                                                                                      data=data, mode=mode,
-                                                                                      prompt={'t': img_tmp,
-                                                                                              'f': img_spec,
-                                                                                              'topo': topo},
-                                                                                      patch_size=patch_size,
-                                                                                      split_nodes=subgraphs)
-
-        pred = self.forward_decoder(latent, imgs_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size=input_size,
-                                    data=data, prompt_graph=prompt)  # [N, L, p*p*1]
+        pred = self.forward_decoder(latent, timestamps, mask, ids_restore, TimeEmb, input_size=input_size,prompt_graph=prompt)  # [N, L, p*p*1]
 
         L = pred.shape[1]
 
 
+        if self.args.isGraph:
 
-        if 'Graph' not in data:
-            if patch_size == 1:
-                pred = self.head_layer_1(pred)
-            elif patch_size == 2:
-                pred = self.head_layer_2(pred)
-            elif patch_size == 4:
-                pred = self.head_layer_4(pred)
-
-        else:
             seq_lengths = [len(i) for i in subgraphs]
             max_len = max(seq_lengths)
+            pred=self.pred_model_linear_GraphPems(pred).reshape(pred.shape[0], T // self.args.t_patch_size,len(subgraphs), self.args.t_patch_size, -1).permute(0, 1, 3, 2, 4)
 
-            # if 'GraphBJ' in data:
-            #     pred = self.pred_model_linear_GraphBJ(pred).reshape(pred.shape[0], T // self.args.t_patch_size,
-            #                                                         len(subgraphs), self.args.t_patch_size, -1).permute(
-            #         0, 1, 3, 2, 4)
-            if 'GraphSH' in data:
-                pred = self.pred_model_linear_GraphSH(pred).reshape(pred.shape[0], T // self.args.t_patch_size,
-                                                                    len(subgraphs), self.args.t_patch_size, -1).permute(
-                    0, 1, 3, 2, 4)
-            # elif 'GraphNJ' in data:
-            #     pred = self.pred_model_linear_GraphNJ(pred).reshape(pred.shape[0], T // self.args.t_patch_size,
-            #                                                         len(subgraphs), self.args.t_patch_size, -1).permute(
-            #         0, 1, 3, 2, 4)
-            elif 'GraphPEMS' in data:
-                pred = self.pred_model_linear_GraphPEMS(pred).reshape(pred.shape[0], T // self.args.t_patch_size,
-                                                                    len(subgraphs), self.args.t_patch_size, -1).permute(
-                    0, 1, 3, 2, 4)
+            # if 'Graph' in self.args.dataset:
+            #     pred=self.pred_model_linear_GraphPems(pred).reshape(pred.shape[0], T // self.args.t_patch_size,len(subgraphs), self.args.t_patch_size, -1).permute(0, 1, 3, 2, 4)
+            # elif 'GraphBJ' in self.args.dataset:
+            #     pred = self.pred_model_linear_GraphBJ(pred).reshape(pred.shape[0], T // self.args.t_patch_size,len(subgraphs), self.args.t_patch_size, -1).permute(0, 1, 3, 2, 4)
+            # elif 'GraphSH' in self.args.dataset:
+            #     pred = self.pred_model_linear_GraphSH(pred).reshape(pred.shape[0], T // self.args.t_patch_size,len(subgraphs), self.args.t_patch_size, -1).permute(0, 1, 3, 2, 4)
+            #
+            # elif 'GraphNJ' in self.args.dataset:
+            #     pred = self.pred_model_linear_GraphNJ(pred).reshape(pred.shape[0], T // self.args.t_patch_size,len(subgraphs), self.args.t_patch_size, -1).permute(0, 1, 3, 2, 4)
 
 
             pred = pred.reshape(pred.shape[0], T, len(subgraphs), -1)
 
             pred = torch.cat([pred[:, :, g, :seq_lengths[g]] for g in range(pred.shape[2])], dim=2)
 
-            target = imgs.squeeze(dim=(1, 4))
+            #torch.Size([3, 24, 21073])
 
-            target = torch.cat([torch.gather(target, 2,
-                                             group.view(1, 1, group.shape[0]).expand(target.shape[0], target.shape[1],
-                                                                                     group.shape[0]).to(target).long())
-                                for group in subgraphs], dim=2)
+            target = value.squeeze(dim=(1, 4))
+            target = torch.cat([torch.gather(target, 2,group.view(1, 1, group.shape[0]).expand(target.shape[0], target.shape[1],group.shape[0]).to(target).long())for group in subgraphs], dim=2)
 
-        if 'Graph' not in data:
-            loss1, loss2, target = self.forward_loss(imgs, pred, mask, patch_size)
-
-        else:
             loss1, loss2, target, mask = self.graph_loss(pred, target)
+        else:
+            if patch_size == 1:
+                pred = self.head_layer_1(pred)
+            elif patch_size == 2:
+                pred = self.head_layer_2(pred)
+            elif patch_size == 4:
+                pred = self.head_layer_4(pred)
+            elif patch_size == 5:
+                pred = self.head_layer_5(pred)
+            loss1, target = self.forward_loss(value, pred, mask, patch_size)
 
-        return loss1, loss2, pred, target, mask
+
+        return loss1, pred, target, mask
 

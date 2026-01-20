@@ -20,7 +20,8 @@ class TokenEmbedding(nn.Module):
 
     def forward(self, x):
         # B, C, T, H, W = x.shape
-        x = self.tokenConv(x)   #（51，1，24，32，32）-->(51,256,2,16,16)
+
+        x = self.tokenConv(x)
         x = x.flatten(3)
         x = torch.einsum("ncts->ntsc", x)  # [N, T, H*W, C]
         x = x.reshape(x.shape[0], -1, x.shape[-1])  # [N, T*H*W, C]   (51,512,256)
@@ -28,7 +29,7 @@ class TokenEmbedding(nn.Module):
     
 
 class SpatialPatchEmb(nn.Module):
-    def __init__(self, c_in, d_model, patch_size):
+    def   __init__(self, c_in, d_model, patch_size):
         super(SpatialPatchEmb, self).__init__()
         self.patch_size = patch_size
         self.conv = nn.Conv2d(in_channels=c_in, out_channels=d_model, kernel_size=patch_size, stride=patch_size)
@@ -41,8 +42,10 @@ class SpatialPatchEmb(nn.Module):
     def forward(self, x):
         B, C, H, W = x.shape    #[9, 256, 21099, 1]
 
-        x = self.conv(x)
-        x = x.reshape(B, self.d_model, H*W//self.patch_size**2).permute(0,2,1)
+        x = self.conv(x)   #[32, 256, 57]' is invalid for input of size 458752
+        x = x.reshape(B, self.d_model, H * W // self.patch_size ** 2).permute(0, 2, 1)
+
+        #x = x.reshape(B, self.d_model,x.shape[2]*x.shape[3]).permute(0, 2, 1)  #if 其他数据集
         return x
 
 class TemporalEmbedding(nn.Module):
@@ -85,9 +88,9 @@ class GraphEmbedding(nn.Module):
             TimeEmb = self.DataEmb.temporal_patch_24.hour_embed(x_mark[:,:,1]) + self.temporal_embedding.weekday_embed(x_mark[:,:,0])
         elif '48' in hour_num:
             TimeEmb = self.DataEmb.temporal_patch_48.hour_embed(x_mark[:,:,1]) + self.temporal_embedding.weekday_embed(x_mark[:,:,0])
-        elif '288' in hour_num:
+        elif '288' in hour_num:#5min
             TimeEmb = self.DataEmb.temporal_patch_288.hour_embed(x_mark[:,:,1]) + self.temporal_embedding.weekday_embed(x_mark[:,:,0])
-        elif '96' in hour_num:
+        elif '96' in hour_num:#15min
             TimeEmb = self.DataEmb.temporal_patch_96.hour_embed(x_mark[:,:,1]) + self.temporal_embedding.weekday_embed(x_mark[:,:,0])
         
         return TimeEmb
@@ -140,6 +143,8 @@ class DataEmbedding(nn.Module):
         self.MIN, self.MID, self.MAX = [2,2,100]
 
     def temporal_emb(self, x_mark, hour_num):
+
+
         if '24' in hour_num:
             TimeEmb = self.temporal_patch_24.hour_embed(x_mark[:,:,1]) + self.temporal_embedding.weekday_embed(x_mark[:,:,0])
         elif '48' in hour_num:
@@ -154,8 +159,10 @@ class DataEmbedding(nn.Module):
         self.value_patch_1 = TokenEmbedding(c_in=self.c_in, d_model=self.d_model, t_patch_size = self.args.t_patch_size,  patch_size=1)
 
         self.value_patch_2 = TokenEmbedding(c_in=self.c_in, d_model=self.d_model, t_patch_size = self.args.t_patch_size,  patch_size=2)
-
+        self.value_patch_3 = TokenEmbedding(c_in=self.c_in, d_model=self.d_model, t_patch_size=self.args.t_patch_size,patch_size=3)
         self.value_patch_4 = TokenEmbedding(c_in=self.c_in, d_model=self.d_model, t_patch_size = self.args.t_patch_size,  patch_size=4)
+        self.value_patch_5 = TokenEmbedding(c_in=self.c_in, d_model=self.d_model, t_patch_size=self.args.t_patch_size,patch_size=5)
+        self.value_patch_10 = TokenEmbedding(c_in=self.c_in, d_model=self.d_model, t_patch_size=self.args.t_patch_size,patch_size=10)
 
         self.temporal_patch_48 = TemporalEmbedding(d_model=self.d_model, t_patch_size = self.args.t_patch_size, hour_size=48, weekday_size = 7)
         self.temporal_patch_24 = TemporalEmbedding(d_model=self.d_model, t_patch_size = self.args.t_patch_size, hour_size=24, weekday_size = 7)
@@ -166,42 +173,49 @@ class DataEmbedding(nn.Module):
 
     def forward(self, x, x_mark, edges = None, is_time=1, patch_size=None, hour_num = None):
         '''
-        x: N, T, C, H, W   x(51,1,24,32,32)
+        x: N, T, C, H, W   x[204, 1, 24, 10, 20]
 
 
-        x_mark: N, T, D
+        x_mark: N, T, D  [204, 24, 2]
         '''
-        N, C, T, H, W = x.shape   #C:24,H32,W32,N51,T:1
+        N, C, T, H, W = x.shape
+
+
         if patch_size == 1:
             TokenEmb = self.value_patch_1(x)
         elif patch_size == 2:
-            TokenEmb = self.value_patch_2(x)   #x(51,1,24,32,32),out:(51,512,256)
+            TokenEmb = self.value_patch_2(x)
+        elif patch_size == 3:
+            TokenEmb = self.value_patch_3(x)
         elif patch_size == 4:
             TokenEmb = self.value_patch_4(x)
+        elif patch_size == 5:
+            TokenEmb = self.value_patch_5(x)
+        elif patch_size == 10:
+            TokenEmb = self.value_patch_10(x)
+
+
         if '24' in hour_num:
             TimeEmb = self.temporal_patch_24(x_mark)
         elif '48' in hour_num:
-            TimeEmb = self.temporal_patch_48(x_mark)  #x_mark(51,24,2),timeb(51,512,256
+            TimeEmb = self.temporal_patch_48(x_mark)
         elif '288' in hour_num:
             TimeEmb = self.temporal_patch_288(x_mark)
         elif '96' in hour_num:
             TimeEmb = self.temporal_patch_96(x_mark)
+
         assert TokenEmb.shape[1] == TimeEmb.shape[1] * H // patch_size * W // patch_size
-        TimeEmb = torch.repeat_interleave(TimeEmb, TokenEmb.shape[1]//TimeEmb.shape[1], dim=1)  #51,512,256
+        TimeEmb = torch.repeat_interleave(TimeEmb, TokenEmb.shape[1]//TimeEmb.shape[1], dim=1)
         assert TokenEmb.shape == TimeEmb.shape
         if is_time==1:
             x = TokenEmb + TimeEmb
-            # gate = torch.sigmoid(nn.Linear(self.d_model, self.d_model).to(x.device)(TokenEmb))  #替换
-            # x = gate * TokenEmb + (1 - gate) * TimeEmb
-
         else:
             x = TokenEmb
+
         if self.training:
             return self.dropout(x), TimeEmb
         else:
             return x, TimeEmb
-
-
 
 
 
